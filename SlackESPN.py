@@ -13,22 +13,42 @@ def handle_command(ARGS, CLIENT, command, channel):
     """
     message = '''Commands I know:
     list teams
-    scoreboard <optional week number>
+    scores <optional week number>
     does Brandon suck
     '''
-
+    message = ""
+    attachments = ""
     if command == "list teams":
         message = '\n'.join(map(lambda x: x.team_name, ARGS.league.teams))
     elif command == "does brandon suck":
         message = 'yes'
-    elif 'scoreboard' in command:
+    elif 'scores' in command:
         pieces = command.split(' ')
         if len(pieces) == 1:
-            message = '\n'.join(map(lambda x: x.home_team.team_name + ' vs. ' + x.away_team.team_name + ': ' + str(x.home_score) + ' vs. ' + str(x.away_score), ARGS.league.scoreboard()))
+            message = 'Current Scoreboard'
+            matchups = ARGS.league.scoreboard(projections=True)
         else:
-            message = '\n'.join(map(lambda x: x.home_team.team_name + ' vs. ' + x.away_team.team_name + ': ' + str(x.home_score) + ' vs. ' + str(x.away_score), ARGS.league.scoreboard(pieces[1])))
-            
-    CLIENT.api_call("chat.postMessage", channel=channel, text=message, as_user=True)
+            message = 'Scoreboard for week ' + pieces[1]
+            matchups = ARGS.league.scoreboard(pieces[1], projections=True)
+
+        attachments = [{
+            'fallback': 'A textual representation of your table data',
+            'fields': [
+                {
+                    'title': 'Home',
+                    'value': '\n'.join(map(lambda x: x.home_team.team_abbrev + "  " + str(x.home_score) + " (" + str(x.home_projection) + ")", matchups)),
+                    'short': True
+                },
+                {
+                    'title': 'Away',
+                    'value': '\n'.join(map(lambda x: x.away_team.team_abbrev + "  " + str(x.away_score) + " (" + str(x.away_projection) + ")", matchups)),
+                    'short': True
+                }
+            ]
+        }]
+    CLIENT.api_call("chat.postMessage", channel=channel, text=message, attachments=attachments, as_user=True)
+
+    # CLIENT.api_call("chat.postMessage", channel=channel, text=message, as_user=True)
 
 
 def parse_slack_output(ARGS, slack_rtm_output):
@@ -87,6 +107,12 @@ if __name__ == '__main__':
     ARGS = PARSER.parse_args()
 
     ARGS.league = League(int(os.environ.get(ARGS.espnleague)), 2017, espn_s2=os.environ.get(ARGS.espns2), swid=os.environ.get(ARGS.swid))
+    # sc = ARGS.league.scoreboard(projections=True)
+    # home_names = '\n'.join(map(lambda x: x.home_team.team_abbrev, sc))
+    # home_scores = '\n'.join(map(lambda x: x.home_score, sc))
+    # home_proj = '\n'.join(map(lambda x: x.home_projection, sc))
+    # print(home_scores)
+    # exit()
     
     CLIENT = SlackClient(os.environ.get(ARGS.slacktoken))
 
